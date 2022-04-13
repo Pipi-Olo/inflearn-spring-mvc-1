@@ -39,7 +39,6 @@ public class RequestHeaderServlet extends HttpServlet {
     private void printHeaders(HttpServletRequest request) {
         System.out.println("--- Headers - start ---");
 
-
 //        1개 Header 조회하기
 //        request.getHeader("host");
 
@@ -51,8 +50,6 @@ public class RequestHeaderServlet extends HttpServlet {
 
         request.getHeaderNames().asIterator()
                 .forEachRemaining(headerName -> System.out.println(headerName + ": " + headerName));
-
-
 
         System.out.println("--- Headers - end ---");
         System.out.println();
