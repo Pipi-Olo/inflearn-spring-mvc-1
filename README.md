@@ -394,3 +394,201 @@ public class ResponseJsonServlet extends HttpServlet {
 
 ---
 
+# MVC 패턴과 서블릿∙JSP
+## 서블릿
+```java
+@WebServlet(name = "responseServlet", urlPatterns = "/response/servlet")
+public class ResponseServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+                
+        // Request
+        String username = request.getParameter("username");
+        int age = Integer.parseInt(request.getParameter("age"));
+ 
+ 		// Business Logic
+        Member member = new Member(username, age);
+       	memberRepository.save(member);
+ 
+        // Response HTML
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+        
+        PrintWriter w = response.getWriter();
+        w.write("<html>\n" +
+                "<head>\n" +
+                " <meta charset=\"UTF-8\">\n" +
+                "</head>\n" +
+                "<body>\n" +
+                "성공\n" +
+                "<ul>\n" +
+                " <li>id="+member.getId()+"</li>\n" + // 동적 HTML
+                " <li>username="+member.getUsername()+"</li>\n" + // 동적 HTML
+                " <li>age="+member.getAge()+"</li>\n" + // 동적 HTML
+                "</ul>\n" +
+                "<a href=\"/index.html\">메인</a>\n" +
+                "</body>\n" +
+                "</html>");
+    }
+}
+```
+
+* 서블릿을 사용해 HTML 을 **동적으로** 만들어 응답했다.
+  * `Member` 객체 값에 따라 HTML 이 동적으로 만들어진다.
+* `서블릿` 👉 자바 코드로 HTML 을 만드는 것
+  * 매우 복잡하고 비효율적이다.
+* `템플릿 엔진` 👉 HTML 문서에 동적인 부분만 자바 코드로 작성하는 것
+  * `JSP`, `Thymeleaf`
+
+## JSP
+```html
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="hello.servlet.domain.member.Member" %>  <!-- java import 역할 -->
+<%@ page import="hello.servlet.domain.member.MemberRepository" %> <!-- java import 역할 -->
+<%
+  MemberRepository memberRepository = MemberRepository.getInstance();
+ 
+  String username = request.getParameter("username");
+  int age = Integer.parseInt(request.getParameter("age"));
+ 
+  Member member = new Member(username, age);
+  memberRepository.save(member);
+%>
+<html>
+<head>
+    <title>Title</title>
+</head>
+<body>
+<ul>
+  <li>id=<%=member.getId()%></li>
+  <li>username=<%=member.getUsername()%></li>
+  <li>age=<%=member.getAge()%></li>
+</ul>
+</body>
+</html>
+```
+
+* JSP 는 HTML 을 중심으로 **동적인** 부분만 자바 코드로 교체하였다.
+  * JSP 는 서버 내부에서 서블릿으로 변한된다.
+* `<%@ page contentType="text/html;charset=UTF-8" language="java" %>`
+  👉 JSP 문서는 항상 이렇게 시작해야 한다.
+* `<%@ page import="" %>`
+  👉 자바의 import 에 해당한다.
+* `<% ~~ %>`
+  👉 자바 코드를 입력하는 부분이다.
+* `<%= ~~ %>`
+  👉 자바 코드를 출력하는 부분이다.
+
+> **참고**
+> JSP는 성능과 기능 측면에서 다른 템플릿 엔진에 밀렸다. 스프링과 잘 통합된 `Thymeleaf`를 사용하자.
+
+## MVC 패턴
+### 서블릿과 JSP 한계
+![](https://velog.velcdn.com/images/pipiolo/post/13d8293d-254f-424a-9746-547dd34048c6/image.png)
+
+* 너무 많은 역할을 담당하고 있다.
+  * `서블릿`, `JSP` 중 하나의 기술로 비지니스 로직과 뷰 렌더링까지 처리하는 것은 너무 많은 역할을 담당하는 것이다.
+  * 결과적으로 유지보수가 어려워진다.
+* 변경 라이플 사이클이 다르다.
+  * 비지니스 로직과 뷰 사이의 변경 사이클이 다르다.
+  * 변경 사이클이 다른 것들을 하나의 코드로 관리하는 것은 좋지 않다.
+* **핵심 비지니스 로직과 뷰 영역이 섞여 있다.**
+  * 자바 코드와 HTML 코드가 섞여 있다.
+  
+### MVC 패턴 등장
+![](https://velog.velcdn.com/images/pipiolo/post/e9836d1b-ed0e-4e29-b9f0-40c3f0dd208b/image.png)
+
+![](https://velog.velcdn.com/images/pipiolo/post/0a19e51e-1b81-4071-91e7-8612c54d41a9/image.png)
+
+* Model
+  * `View` 에 출력할 데이터를 저장한다.
+  * `Model` 덕분에 `View` 는 비지니스 로직이나 데이터 접근을 몰라도 된다.
+* View
+  * `Model` 에 저장된 데이터를 렌더링하는데 집중한다.
+  * HTML 을 생성한다.
+* Controller
+  * HTTP 요청을 읽고 파라미터를 검증한다.
+  * 비지니스 로직을 실행한다.
+  * 결과 데이터를 `Model` 에 담아서 `View` 에게 전달한다.
+* **기존에 섞여있던 비지니스 로직과 뷰 로직을 분리한다.**
+
+> **MVC 패턴 2**
+> 컨트롤러는 HTTP 요청∙응답에 집중한다. 비지니스 로직은 서비스 계층에서 별도로 처리한다. 컨트롤러 계층은 서비스 계층을 호출하는 역할을 담당한다.
+
+### MVC 패턴 적용
+```java
+@WebServlet(name = "mvcMemberSaveServlet", urlPatterns = "/servlet-mvc/members/save")
+public class MvcMemberSavetServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+                
+        String username = request.getParameter("username");       
+        int age = Integer.parseInt(request.getParameter("age"));
+        
+        Member member = new Member(username, age);
+        memberRepository.save(member);
+        
+        request.setAttribute("member", member);
+                
+        String viewPath = "/WEB-INF/views/save.jsp";
+        RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response);
+    }
+}
+```
+```java
+@WebServlet(name = "mvcMemberListServlet", urlPatterns = "/servlet-mvc/members")
+public class MvcMemberListServlet extends HttpServlet {
+
+    private MemberRepository memberRepository = MemberRepository.getInstance();
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+                
+        List<Member> members = memberRepository.findAll();
+        
+        request.setAttribute("members", members);
+                
+        String viewPath = "/WEB-INF/views/members.jsp";
+        RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response);
+    }
+}
+```
+
+* `request.setAttribute()` 👉 request 객체에 데이터를 보관해서 뷰에 전달한다.
+  * 뷰는 `request.getAttribute()` 를 통해 데이터를 얻는다.
+* `dispatcher.forward()` 👉 다른 서블릿이나 JSP로 이동한다. 서버 내부 호출이 일어난다.
+* **MVC 패턴 덕분에 뷰와 컨트롤러의 역할을 구분지었다.**
+  * 뷰는 JSP가, 컨트롤러는 서블릿이 담당한다.
+  * 유지보수가 용이하다.
+
+> **`/WEB-INF`**
+> 이 경로 안에 있는 JSP는 외부에서 호출할 수 없다. 오직 컨트롤러를 통해서만 접근 가능하다.
+
+> **Redirect vs Forward**
+> 리다이렉트는 클라이언트에 응답이 갔다가 클라이언트가 다시 서버에 리다이렉트 경로로 요청한다. 클라이언트가 인지할 수 있고 URL도 변경된다.
+> 반면에, 포워드는 서버 내부 호출이기 때문에 클라이언트가 인지할 수 없다.
+
+### MVC 패턴 한계
+* **공통 처리가 어렵다.**
+  * 포워드 중복 👉 뷰로 이동하는 코드를 항상 호출해야 한다.
+  * viewPath 중복
+    * prefix : `/WEB-INF/views/`
+    * suffix : `.jsp` 👉 특정 기술에 의존적이다.
+  * 불필요한 의존
+    * 사용 여부와 관계 없이 `HttpServletXXX` 객체를 파라미터로 받아야 한다.
+* 컨트롤러에서 공통으로 처리해야 하는 부분이 많아진다.
+  👉 수문장 역할을 하는 **프론트 컨트롤러(`Front Controller`)**를 도입한다.
+  
+---
+
