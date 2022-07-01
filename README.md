@@ -117,3 +117,280 @@ public class HelloServlet extends HttpServlet {
     * 과거에는 `War` 파일을 생성해서 WAS에 배포함
 
 ---
+
+# 서블릿
+```java	
+@ServletComponentScan
+@SpringBootApplication
+public class ServletApplication {
+ 
+	public static void main(String[] args) {
+		SpringApplication.run(ServletApplication.class, args);
+	}
+}
+```
+
+```java
+@WebServlet(name="helloServlet", urlPatterns = "/hello")
+public class HelloServlet extends HttpServlet {
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+    }
+}
+```
+
+* `@ServletComponentScan` 👉 서블릿 컴포넌트를 자동 등록해준다.
+* `@WebServlet` 👉 서블릿 애노테이션
+  * `name` 👉 서블릿 이름을 지정한다.
+  * `urlPatterns` 👉 매핑할 URL 패턴을 지정한다.
+
+> **참고**
+> 서블릿은 톰캣 같은 웹 애플리케이션 서버를 설치하고 그 위에 서블릿 코드를 클래스 파일로 빌드해서 사용한다.
+> 스프링 부트는 톰캣 서버를 내장하고 있으므로 WAS 설치 없이, 편리하게 서블릿 코드를 실행할 수 있다.
+
+## HttpServletRequest
+```java
+/**
+  * URL : http://localhost:8080/request?username=hi
+  */
+@WebServlet(name="requestServlet", urlPatterns = "/request")
+public class RequestServlet extends HttpServlet {
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+		
+        System.out.println("request.getMethod() = " + request.getMethod()); // GET
+        System.out.println("request.getRequestURL() = " + request.getRequestURL()); // http://localhost:8080/request
+        System.out.println("request.getQueryString() = " + request.getQueryString()); // username=hi
+        System.out.println("request.isSecure() = " + request.isSecure()); // HTTPS 사용 유무
+        System.out.println("request.getServerPort() = " + request.getServerPort()); // Host Port
+        
+        ...
+    }
+}
+```
+
+* 서블릿은 HTTP 요청 메시지를 파싱해서 `HttpServletRequest` 객체에 담아서 제공한다.
+* HTTP 요청 메시지
+  * START LINE
+    * HTTP 메소드
+    * URL
+    * 쿼리 스트링
+    * 스키마, 프로토콜
+  * 헤더
+  * 바디
+    * Form 파라미터 형식 조회
+    * Message Body 데이터 조회
+* `HttpServletRequest`∙`HttpServletResponse` 는 HTTP 요청∙응답 메시지를 편리하게 사용하도록 해주는 객체이다.
+
+
+## HTTP 요청 데이터
+* 클라이언트에서 서버에 데이터를 전송한다. 서버는 요청된 데이터를 읽는다.
+* GET - 쿼리 파라미터
+  * 메시지 바디 없이, URL 쿼리 파라미터를 통해 데이터를 전달한다.
+  * /url**?username=hello&age=20**
+  * 검색, 필터, 페이징에서 사용된다.
+* POST - HTML Form
+  * 메시지 바디에 쿼리 파라미터 형식으로 전달한다.
+  * content-type: **application/x-www-form-urlencoded**
+  * HTML Form에서 아용된다.
+* HTTP Message Body
+  * 메시지 바디에 데이터를 직접 전달한다.
+  * 데이터 형식은 주로 JSON 사용한다.
+    * content-type: **application/json**
+  * POST, PUT, PATCH 등 다양한 HTTP 메소드가 사용된다.
+  * HTTP API에서 사용된다.
+
+### GET 쿼리 파라미터
+```java
+/**
+  * URL : http://localhost:8080/request-query?username=kim&age=20
+  */
+@WebServlet(name="requestQueryServlet", urlPatterns = "/request-query")
+public class RequestQueryServlet extends HttpServlet {
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+
+		String username = request.getParameter("username"); // kim
+        String age = request.getParameter("age"); // 20
+    }
+}
+```
+
+* 메시지 바디 없이, URL 쿼리 파라미터를 통해 데이터를 전달한다.
+* /url**?username=hello&age=20**
+  * 쿼리 파라미터는 URL 다음에 온다.
+  * `?` 으로 시작한다.
+  * 추가 파라미터는 `&` 으로 구분한다. 
+
+### POST HTML Form
+```java
+/**
+  * URL : http://localhost:8080/request-html
+  * content-type : application/x-www-form-urlencoded
+  * message body : username=kim&age=20
+  */
+@WebServlet(name="requestHtmlServlet", urlPatterns = "/request-html")
+public class RequestHtmlServlet extends HttpServlet {
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+    			throws ServletException, IOException {
+
+		String username = request.getParameter("username"); // kim
+        String age = request.getParameter("age"); // 20
+    }
+}
+```
+![](https://velog.velcdn.com/images/pipiolo/post/27856331-bbbb-4ac5-82b0-110e2117eca9/image.png)
+
+* 메시지 바디에 쿼리 파라미터 형식으로 전달한다.
+* content-type: **application/x-www-form-urlencoded**
+* 클라이언트(웹 브라우저)는 두 방식에 차이가 있지만, **서버는 둘 다 같은 형식이다.**
+  * `request.getParameter()` 는 GET - URL 쿼리 파라미터 형식과 POST - HTML Form 형식 둘다 지원한다.
+
+> **참고**
+> `content-type` 은 HTTP 메시지 바디의 데이터 형식을 지정한다.
+> **GET - URL 쿼리 파라미터** 형식은 HTTP 메시지 바디를 사용하지 않기 때문에 `content-type` 이 없다.
+> **POST - HTML Form** 형식은 HTTP 메시지 바디에 데이터를 전달하므로 `content-type: application/x-www-form-urlencoded` 으로 지정해야 한다.
+
+### HTTP Message Body
+```java
+/**
+  * URL : http://localhost:8080/request-json
+  * content-type : application/json
+  * message body : {"username" : "kim", "age" : 20}
+  */
+@WebServlet(name="requestJsonServlet", urlPatterns = "/request-json")
+public class RequestJsonServlet extends HttpServlet {
+    
+ 	private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+    			throws ServletException, IOException {
+
+		String inputStream = request.getInputStream();
+        String messageBody = StreamUtils.copyToString(inputStream, UTF_8);
+        
+        HelloDTO helloDto = objectMapper.readValue(messageBody, HelloDTO.class); // JSON -> 객체 변환
+    }
+}
+```
+
+* HTTP API 에서 사용된다.
+* 메시지 바디에 데이터를 직접 전달한다.
+  * content-type: **applicaion/json**
+  * message body: `{"username" : "kim", "age" : 20}`
+* `ObjectMapper` 는 JSON 요청 데이터를 `HelloDTO.class` 객체로 변환한다.
+
+> **참고**
+> JSON 데이터를 파싱해서 자바 객체로 변환하려면 JSON 변환 라이브러리가 필요하다. Spring MVC 는 Jackson 라이브러리(`ObjectMapper`)를 사용한다.
+
+## HttpServletResponse
+```java
+@WebServlet(name="responseServlet", urlPatterns = "/response")
+public class ResponseServlet extends HttpServlet {
+    
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+    			throws ServletException, IOException {
+                
+        // [status-line]
+        response.setStatus(HttpServletResponse.SC_OK);
+ 
+        // [response-headers]
+        response.setHeader("Content-Type", "text/plain;charset-utf-8");
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response.setHeader("my-header", "hello"); // 커스텀 헤더
+ 
+        // [Header 편의 메서드]
+        response.setContentType("text/plain");
+        response.setCharacterEncoding("utf-8");
+        
+        Cookie cookie = new Cookie("myCookie", "good");
+        cookie.setMaxAge(600);
+        response.addCookie(cookie);
+        
+        response.sendRedirect("/basic/hello-form.html");
+ 
+        // [message body]
+        PrintWriter writer = response.getWriter();
+        writer.println("ok");
+    }
+}
+```
+
+## HTTP 응답 데이터
+* 서버에서 클라이언트로 데이터를 전송한다.
+* 단순 테스트 응답
+  * `writer.println("ok")`
+* HTML 응답
+* HTTP API
+  * 메시지 바디에 JSON 형식 데이터를 전달한다.
+
+### 단순 텍스트 응답
+### HTML 응답
+```java
+@WebServlet(name = "responseHtmlServlet", urlPatterns = "/response-html")
+public class ResponseHtmlServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+    			throws ServletException, IOException {
+                
+        // Content-Type : text/html; charset=utf-8
+        response.setContentType("text/html");
+        response.setCharacterEncoding("utf-8");
+ 
+        // HTML Response
+        PrintWriter writer = response.getWriter();
+        writer.println("<html>");
+        writer.println("<body>");
+        writer.println("<div>HELLO?</div>");
+        writer.println("</body>");
+        writer.println("</html>");
+    }
+}
+```
+* HTML 응답은
+  * content-type: **text/html**
+
+### HTTP API 
+```java
+@WebServlet(name = "responseJsonServlet", urlPatterns = "/response-json")
+public class ResponseJsonServlet extends HttpServlet {
+    
+    private ObjectMapper objectMapper = new ObjectMapper();
+ 
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+    			throws ServletException, IOException {
+                
+        // Content-Type: application/json
+        response.setContentType("application/json");
+ 
+        HelloData helloData = new HelloData();
+        helloData.setUsername("kim");
+        helloData.setAge(20);
+ 
+        // {"username":"kim", "age":20}
+        String result = objectMapper.writeValueAsString(helloData);
+        response.getWriter().write(result);
+    }
+}
+```
+
+* content-type: **application/json**
+* `objectMapper.writeValueAsString()` 👉 객체를 JSON 문자로 변경한다.
+
+> **참고**
+> `application/json` 은 `utf-8` 을 사용하도록 되어 있다. `charset=utf-8` 같은 추가 파라미터를 지원하지 않는다. 따라서 `application/json;charset=utf-8` 은 불필요한 파라미터만 추가된 것이다.
+
+---
+
