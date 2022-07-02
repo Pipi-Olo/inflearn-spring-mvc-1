@@ -592,3 +592,166 @@ public class MvcMemberListServlet extends HttpServlet {
   
 ---
 
+# MVC 프레임워크
+## 프론트 컨트롤러 패턴
+![](https://velog.velcdn.com/images/pipiolo/post/607d2266-48b0-40cf-a3cd-c646ca7247d8/image.png)
+
+* 공통 처리를 프론트 컨트롤러가 담당한다. **입구를 하나로!**
+* 프론트 컨트롤러 서블릿만 클라이언트의 요청을 받는다.
+  * 프론트 컨트롤러가 요청에 따라 알맞는 컨트롤러를 호출한다.
+* 나머지 컨트롤러들은 서블릿에 의존할 필요 없다.
+
+## MVC 프레임워크 만들기
+![](https://velog.velcdn.com/images/pipiolo/post/d3a87ff6-e874-47ae-8297-df536e0ba805/image.png)
+
+### 프론트 컨트롤러 도입
+```java
+@WebServlet(name = "frontController", urlPatterns = "/")
+public class FrontController extends HttpServlet {
+
+	private Map<String, Controller> controllerMap = new HashMap<>();
+    
+    public FrontController() {
+    	controllerMap.put("/controller/memberes/save", new SaveController());
+        controllerMap.put("/controller/memberes", new ListController());
+    }
+
+	@Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) {
+    	String requestURL = request.getRequestURL();
+        Controller controller = controllerMap.get(requestURL);
+        
+        controller.process(request, response);
+    }
+}
+```
+
+* `urlPatterns = "/"` 👉 모든 컨트롤러의 수문장 역할을 한다.
+* `controllerMap`
+  * key 👉 매핑 URL
+  * value 👉 컨트롤러
+* 컨트롤러 인터페이스(`Controller`)를 도입한다.
+  * 프론트 컨트롤러는 컨트롤러 인터페이스에 의존한다.
+  * 각 컨트롤러들은 인터페이스를 구현한다.
+  * 프론트 컨트롤러는 다양한 컨트롤러 구현체들을 받을 수 있다.
+
+### 뷰 도입
+```java
+public class MyView {
+	
+    private String viewPath;
+    
+    public void render(HttpServletRequest request, HttpServletResponse response) {
+    	RequestDispatcher dispatcher = request.getRequestDispatcher(viewPath);
+        dispatcher.forward(request, response); // JSP forword
+    }
+}
+```
+
+* `MyView` 객체를 도입한다.
+* 뷰로 이동하는 중복 부분을 제거한다.
+* 컨트롤러가 `MyView` 를 반환하면, 프론트 컨트롤러가 `render()` 를 실행한다.
+
+### ModelView 도입
+```java
+public class SaveController implements Controller {
+
+	public ModelView process(Map<String, String> paramMap) {
+    	return new ModelView("save");
+    }
+}
+```
+```java
+public class ModelView {
+    private String viewName;
+    private Map<String, Object> model = new HashMap<>();
+}
+```
+
+* 서블릿 종속성 제거한다.
+  * 기존 컨트롤러들은 서블릿에 종속적인 `HttpServletXXX` 를 사용했다.
+  * 프론트 컨트롤러가 각 컨트롤러가 필요한 파라미터를 `paramMap` 객체에 담아서 호출한다.
+* 뷰 이름 중복을 제거한다.
+  * 이제 컨트롤러는 `ModelView` 객체를 반환한다.
+  * 컨트롤러는 뷰의 논리 이름을 반환한다.
+  * 실제 뷰의 물리 위치는 프론트 컨트롤러가 처리한다.
+    * members 👉 `/WEB-INF/views/members.jsp` 
+    * save 👉 `/WEB-INF/views/save.jsp`
+* 뷰에서 필요한 데이터들은 `model`에 담는다.
+
+### 뷰 리졸버 도입
+```java
+@WebServlet(name = "frontController", urlPatterns = "/")
+public class FrontController {
+    
+  	private Map<String, Controller> controllerMap = new HashMap<>();
+    
+    public FrontController() {
+    	controllerMap.put("/controller/memberes/save", new SaveController());
+        controllerMap.put("/controller/memberes", new ListController());
+    }
+    
+    @Override
+    protected void service(HttpServletRequest reqeust, HttpServletResponse response) {
+        String requestURL = request.getRequestURL();
+        Controller controller = controllerMap.get(requestURL);
+        
+        Map<String, String> paramMap = createParamMap(request);
+        ModelView mv = controller.process(paramMap);
+        
+        MyView view = viewResolver(mv.getViewName());
+        view.render(mv.getModel(), reqeust, response);
+    }
+    
+    private Map<String, String> createParamMap(HttpServletRequest reqeust) {
+    	Map<String, String> paramMap = new HashMap<>();
+        
+        List<String> paramNames = reqeust.getParameterNames();
+        for (String paramName : paramNames) {
+        	paramMap.put(paramName, request.getParameter(paramName);
+        }
+        
+        return paramMap;
+    }
+    
+    private MyView viewResolver(String viewName) {
+		return new MyView("/WEB-INF/views/" + viewName + ".jsp");
+	}
+}
+```
+
+![](https://velog.velcdn.com/images/pipiolo/post/4b60e6d5-f2d7-4f0f-a47d-806fb093e9e5/image.png)
+
+* 컨트롤러가 반환한 뷰 논리 이름을 물리 뷰 경로로 변경한다.
+* 뷰 경로(`prefix`), 뷰 확장명(`suffix`)이 변경되어도 프론트 컨트롤러만 변경하면 된다.
+  * 기존에는 모든 컨트롤러에서 변경이 필요했다.
+
+### 뷰 네임 반환
+```java
+public class SaveController implements Controller {
+	
+    public String process(Map<String, String> paramMap, Map<String, Object> model) {
+    	return "save";
+    }
+}
+```
+
+* 컨트롤러는 단순히 뷰 이름만 반환한다.
+  * 기존에는 `ModelView` 를 반환했다.
+* 대신에 `ModelView` 가 가지고 있던 `model`을 파라미터로 받는다.
+  * 뷰에서 필요한 데이터들을 `model`에 담는다.
+
+### 어댑터 패턴 도입
+![](https://velog.velcdn.com/images/pipiolo/post/1dc3daf8-1fd5-4579-aa9c-4f55699e353b/image.png)
+
+* 기존에는 한 가지 컨트롤러 인터페이스만 사용할 수 있었다.
+  * 인터페이스에 정의된 매개변수, 반환 값만 사용할 수 있었다.
+* 핸들러 어댑터 (`Handler Adapter`)
+  * 다양한 방식의 컨트롤러 인터페이스를 처리할 수 있다.
+  * `ModelView`, 뷰 이름 등 다양한 반환 값을 지원한다.
+* 핸들러 (`Handler`)
+  * 컨트롤러 확장한 개념
+  * 컨트롤러 뿐만 아니라, 어댑터만 있다면 URL 매핑을 통해 어떤 것이라도 처리할 수 있다.
+  
+---
+
