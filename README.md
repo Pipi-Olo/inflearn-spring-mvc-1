@@ -755,3 +755,132 @@ public class SaveController implements Controller {
   
 ---
 
+# 스프링 MVC 구조 이해
+![](https://velog.velcdn.com/images/pipiolo/post/1991c942-de5a-41b8-a2ac-c809d7844aed/image.png)
+
+* MVC 프레임워크 👉 스프링 MVC
+  * FrontController 👉 Dispatcher Servlet
+  * handlerMappingMap 👉 HandlerMapping
+  * MyHandlerAdapter 👉 HandlerAdapter
+  * ModelView 👉 ModelAndView
+  * MyView 👉 View
+  * viewResolver 👉 ViewResolver
+
+## DispatcherServlet
+* 디스패처 서블릿(`Dispatcher Servlet`)은 스프링 MVC의 프론트 컨트롤러이다.
+* `HttpServlet` 을 상속하고 모든 경로(`urlPatterns="/"`)에 대해서 매핑한다.
+  * `DispatcherServlet.doDispatch()` 가 호출된다.
+
+### 동작 순서
+* 핸들러 조회 👉 핸들러 매핑을 통해 요청 URL에 매핑된 핸들러(컨트롤러)를 조회한다.
+* 핸들러 어댑터 조회 👉 핸들러를 실행할 수 있는 핸들러 어댑터를 조회한다.
+* 핸들러 어댑터 실행
+* 핸들러 실행
+* ModelAndView 반환 👉 핸들러 어댑터는 핸들러 반환 값을 ModelAndView 로 변환해서 반환한다.
+* ViewResolver 호출 👉 뷰 리졸버를 찾고 실행한다.
+* View 반환 👉 뷰 리졸버는 논리 이름을 물리 이름으로 바꾸고 View 객체로 반환한다.
+* 렌더링 👉 View 객체를 통해서 렌더링한다.
+  
+## HandlerMapping & HandlerAdapter
+
+### HandlerMapping (핸들러 매핑)
+* 핸들러 매핑에서 핸들러(컨트롤러)를 찾을 수 있어야 한다.
+* `RequestMappingHandlerMapping` 👉 애노테이션 기반의 컨트롤러인 `@RequestMapping`에서 사용한다.
+* `BeanNameUrlHandlerMapping` 👉 스프링 빈의 이름으로 핸들러를 찾는다.
+
+### HandlerAdapter (핸들러 어댑터)
+* 핸들러를 실행할 수 있는 핸들러 어댑터가 필요하다.
+* `RequestMappingHandlerAdapter` 👉 애노테이션 기반의 컨트롤러인 `@RequestMapping`에서 사용한다
+* `HttpRequestHandlerAdapter` 👉 HttpRequestHandler 처리한다.
+* `SimpleControllerHandlerAdapter` 👉 Controller 인터페이스(애노테이션X, 과거에 사용) 처리한다.
+ 
+> **@RequestMapping**
+> 가장 우선 순위가 높은 핸들러 매핑과 어댑터는 `RequestMappingHandlerXXX` 이다. `@RequestMapping` 애노테이션 기반의 컨트롤러를 지원하는 매핑과 어댑터이다.
+
+## ViewResolver
+* 컨트롤러가 반환한 뷰 논리 이름을 물리 뷰 경로로 변경한다.
+* `BeanNameViewResolver` 👉 빈 이름으로 뷰를 찾아서 반환한다.
+* `InternalResourceViewResolver` 👉 JSP를 처리할 수 있는 뷰를 반환한다.
+* `ThymeleafViewResolver` 👉 타임리프 뷰 템플릿을 처리할 수 있는 뷰를 반환한다.
+
+> **`application.properties`**
+> ```
+> spring.mvc.view.prefix = /WEB-INF/views/
+> spring.mvc.view.suffix = .jps
+> ```
+> 스프링 부트는 `InternalResourceViewResolver` 를 자동 등록하는데, 이 때 `application.properties` 에 등록한 설정 정보를 사용한다.
+
+## 스프링 MVC
+```java
+@Controller
+@RequestMapping("members")
+public class MemberController {
+
+	private final MemberRepository memberRepository;
+
+	@GetMapping("/add-form")
+    public String addForm() {
+    	return "addForm";
+    }
+    
+    @PostMapping("/save")
+    public String save(@RequestParam("username") String username, 
+                       @RequestParam int age,
+                       Model model
+    ) {
+    	Member member = new Member(username, age);
+    	memberRepository.save(member);
+        
+        model.addAttribute("member", member);
+        return "save";
+    }
+    
+    @GetMapping
+    public ModelAndView members() {
+    	List<Member> members = memberRepository.findAll();
+        
+        ModelAndView mv = new ModelAndView("members"):
+        mv.addObject("members", members);
+        
+        return mv;
+    ]
+}
+```
+
+### @RequestMapping
+
+* `@Controller`
+  * 자동으로 스프링 빈으로 등록된다. 내부에 `@Component` 가 있다.
+  * 스프링 MVC에서 애노테이션 기반 컨트롤러로 인식된다.
+* `@RequestMapping`
+  * 요청 정보를 매핑한다.
+    * 해당 URL이 호출되면 메서드를 호출한다.
+  * 애노테이션 기반 컨트롤러를 지원한다.
+    * `RequestMappingHandlerMapping`∙`RequestMappingHandlerAdpater` 이 사용된다.
+  * 실무에서 99.9% 사용되는 방식이다.
+* `@RequestMapping` 👉 `@GetMapping`∙`@PostMapping`
+  * URL 매칭 뿐만 아니라, HTTP Method 도 함께 구분할 수 있다.
+  * `@RequestMapping(value = "add-form", method = RequestMethod.GET)` 와 동일히다.
+  * GET, POST, PUT, DELETE, PATCH 모두 사용 가능하다.
+    * `@RequestMapping` 은 모든 HTTP Method 접근 허용한다.
+* `@RequestParam`
+  * HTTP 요청 파라미터를 `@RequestParam` 으로 받을 수 있다.
+  * `@RequestParam("username")` 은 `request.getParameter("username")` 와 거의 동일하다.
+  * 마찬가지로 GET 쿼리 파라미터, POST Form 방식 모두 지원한다.
+
+> **`RequestMappingHandlerMapping`**
+> `@Controller` 또는 `@RequestMapping` 이 클래스 레벨이 붙은 경우 매핑 정보를 인식한다.
+
+### Model
+* `ModelAndView`
+  * 모델과 뷰 정보를 담아서 반환한다.
+  * 일반적으로 `Model`∙`ViewName` 으로 사용한다.
+* `Model`
+  * `Model` 을 파라미터로 받을 수 있다.
+  * 뷰에 필요한 데이터를 입력할 수 있다.
+* `ViewName`
+  * 뷰의 논리 이름을 문자로 반환한다.
+  * 뷰 리졸버를 통해 뷰의 물리 경로로 변환된다.
+  
+--- 
+
