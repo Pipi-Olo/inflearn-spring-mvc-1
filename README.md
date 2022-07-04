@@ -335,6 +335,18 @@ public class ResponseServlet extends HttpServlet {
   * 메시지 바디에 JSON 형식 데이터를 전달한다.
 
 ### 단순 텍스트 응답
+```java
+@WebServlet(name = "responseStringServlet", urlPatterns = "/response-string")
+public class ResponseStringServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+    			throws ServletException, IOException {
+                
+        response.getWriter().write("OK");        
+    }
+}
+```
 ### HTML 응답
 ```java
 @WebServlet(name = "responseHtmlServlet", urlPatterns = "/response-html")
@@ -358,8 +370,8 @@ public class ResponseHtmlServlet extends HttpServlet {
     }
 }
 ```
-* HTML 응답은
-  * content-type: **text/html**
+
+* content-type: **text/html**
 
 ### HTTP API 
 ```java
@@ -448,7 +460,7 @@ public class ResponseServlet extends HttpServlet {
 ```html
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="hello.servlet.domain.member.Member" %>  <!-- java import 역할 -->
-<%@ page import="hello.servlet.domain.member.MemberRepository" %> <!-- java import 역할 -->
+<%@ page import="hello.servlet.domain.member.MemberRepository" %>
 <%
   MemberRepository memberRepository = MemberRepository.getInstance();
  
@@ -1282,3 +1294,94 @@ public class ResponseBodyController {
 
 ---
 
+# 참고
+## 로깅 라이브러리
+```java
+@RestController
+public class LogController {
+	
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    
+    @RequestMapping("log-test")
+    public String log() {
+    
+    	String log = "Log Test";
+    
+    	log.trace("trace log={}", log);
+        log.debug("debug log={}", log);
+        log.info("info log={}", log);
+        log.warn("warn log={}", log);
+        log.error("error log={}", log);
+        
+        log.debug("data = " + data);
+    }
+}
+```
+
+* 스프링 부트는 스프링 부트 로깅 라이브러리(`spring-boot-starter-logging`)를 자동 포함한다.
+* 스프링 부트 로깅 라이브러리는 다음을 포함한다.
+  * `SLF4J` 👉 인터페이스
+  * `Logback` 👉 구현체
+* 로그 레벨 설정
+  * LEVEL : `TRACE > DEBUG > INFO > WARN > ERROR`
+  * 개발 서버 👉 `DEBUG` ~ 
+  * 운영 서버 👉 `INFO` ~
+* 장점
+  * 코드 변경 없이 상황에 맞게 레벨을 통해 로그를 조절할 수 있다.
+  * 파일, 네트워크 등 다양한 위치에 로그를 남길 수 있다.
+    * 날짜, 용량에 따라 로그를 분할할 수 있다.
+  * 성능이 `System.out` 보다 좋다.
+* 로그를 사용하자.
+
+> **`log.debug("data = " + data)`**
+>  * 불필요한 연산이 발생한다.
+>  * 로그 레벨을 `INFO`로 설정해도 문자 더하기 연산이 실행된다.
+>  * `log.debug("data = {}", data)` 을 사용하자.
+
+
+> **`@RestController`**
+> `@Controller` 는 반환 값이 뷰 이름으로 인식된다. 뷰를 찾고 렌더링한다.
+> `@RestController` 는 반환 값이 HTTP 메시지 바디에 입력된다. 클라이언트는 실행 경과로 `OK` 메시지를 받는다. `@ResponseBody` 와 연관이 있다.
+
+## PRG (Post / Redirect / Get)
+### POST + 새로 고침
+![](https://velog.velcdn.com/images/pipiolo/post/59de78fa-057e-4a26-8309-c71e49e4dbb6/image.png)
+
+* `새로 고침` 은 마지막에 서버에 전송한 데이터를 다시 전송한다.
+  * 마지막에 전송한 데이터가 상품을 등록하는 `Post /add` 이었으므로 사움이 계속해서 **중복 등록**된다.
+* 상품을 조회하는 `Get` 은 중복 호출되어도 문제 없다.
+  * 회원 가입, 상품 주문 등 `Post` 중복 호출은 큰 오류를 일으킨다.
+  
+### Post / Redirect / Get
+```java
+@Controller
+public class Controller {
+
+	@PostMapping("/add")
+    public String addItem(Item item, 
+                          RedirectAttributes redirectAddtributes
+    ) {
+    	Item savedItem = itemService.save(item);
+        
+        redirectAddtributes.addAttribute("itemId", savedItem.getId());
+        redirectAddtributes.addAttribute("status", true);
+    
+    	return "redirect:/items/{itemId}";
+    }
+}
+
+```
+![](https://velog.velcdn.com/images/pipiolo/post/98e25f8c-6a84-4af3-809f-3c21f2597d6b/image.png)
+
+* `Post` 상품 등록 후 뷰 템플릿으로 이동하는 것이 아니라, 리다이렉트를 통해 상품 상세 화면으로 넘어간다.
+  * **리다이렉트는 URL 을 변경하기 때문에**, 새로 고침을 해도 `Post /add` 가 아닌 `Get /items/{id}` 로 넘어간다.
+* `RedirectAttributes` 는 URL 인코딩, `pathVariable`, 쿼리 파라미터까지 처리한다.
+  * `URL 인코딩` 👉 URL 을 변경한다.
+  * `pathVariable` 👉 `redirect:/items/{itemId}`
+  * 쿼리 파라미터 👉 `?status=true`
+    * `pathVariable` 이외 나머지는 쿼리 파라미터로 처리한다.
+
+> **참고**
+> `redirect:/items/ + item.getId()` 는 `Redirect` 에서 URL 에 변수를 사용하는 것은 URL 인코딩이 안 되기 때문에 위험하다. `RedirectAttributes` 를 사용하자.
+
+---
