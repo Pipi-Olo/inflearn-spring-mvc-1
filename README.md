@@ -884,3 +884,401 @@ public class MemberController {
   
 --- 
 
+# 스프링 MVC 이해
+```java
+@RequestMapping("/mapping")
+@RestController
+public class MappingController {
+	
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    
+    @GetMapping("/users/{userId}/orders/{orderId}")
+    public String mappingPath(@PathVariable("userId") String data, @PathVariable Long orderId) {
+    	log.info("userId = {}, orderId={}", data, orderId);
+        return "OK";
+    }
+}
+```
+
+* HTTP API 는 URL 경로에 식별자를 넣는 스타일을 선호한다.
+* `@PathVariable`
+  * URL 경로를 템플릿화 할 수 있다.
+  * `@PathVariable` 이름과 파라미터 이름이 같으면 생략할 수 있다.
+  
+> **다른 URL → 같은 매핑**
+> 다음 두 요청은 다른 URL 이지만, 스프링은 같은 요청으로 매핑한다.
+> * URL 요청 → `/hello`, `/hello/`
+> * 매핑 → `/hello`
+
+## HTTP 헤더
+```java
+@Slf4j
+@RestController
+public class RequestHeaderController {
+
+	@RequestMapping("/headers")
+    public String headers(HttpServletRequest request, HttpServletResponse response,
+                          HttpMethod httpMethod,
+                          Locale locale,
+                          @RequestHeader MultiValueMap<String, String> headerMap,
+                          @RequestHeader("host") String host,
+                          @CookieValue(value = "myCookie", required = false) String coockie
+    ) {
+		return "OK";
+    }                     
+}
+```
+
+* `HttpMethod` 👉 HTTP 메서드를 조회한다.
+* `Locale` 👉 Locale 정보를 조회한다.
+* `@RequestHeader MultiValueMap<String, String>` 👉 모든 HTTP 헤더를 MultiValueMap 형식으로 조회한다.
+* `@RequestHeader("host") String host` 👉 특정 HTTP 헤더를 조회한다.
+  * 속성
+    * `required` → 필수 값 여부
+    * `defaultValue` → 기본 값 지정
+* `@CookieValue(value = "myCookie", required = false) String cookie` 👉 특정 쿠기를 조회한다.
+  * 속성
+    * `required` → 필수 값 여부
+    * `defaultValue` → 기본 값 지정
+
+> **`MultiValueMap`**
+> 하나의 키에 여러 값을 받을 수 있는 `Map` 이다.
+> ```java
+> MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+> map.add("key", "value1");
+> map.add("key", "value2");
+>
+> List<> values = map.get("key");
+> ```
+  
+> **`@Slf4j`**
+> * `private static final Logger log = LoggerFactory.getLogger(getClass());`
+> * 코도를 자동으로 생성해서 로그를 선언해준다.
+>   * 실제 생성되는 코드는 패키지 명까지 포함한다.
+> * 개발자는 `log` 를 사용하면 된다.
+  
+## HTTP 요청
+* GET 쿼리 파라미터∙POST HTML Form
+  * 형식이 같으므로 구분없이 조회할 수 있다.
+  * 요청 파라미터(`Request Parameter`) 조회라 한다.
+* HTTP Message Body
+  * HTTP API 에서 사용된다.
+
+### GET 쿼리 파라미터∙POST HTML Form
+#### @RequestParam
+```java
+@ResponseBody
+@Controller
+public class RequestParamController {
+	
+    @RequestMapping("/request-param")
+    public String requestParam(@RequestParam("username") String hello, int age) {
+    	return "OK";
+    }
+}
+```
+
+* `@ResponseBody` 👉 반환 값을 뷰 조회로 사용하지 않고 HTTP Message Body 에 입력한다.
+  * HTTP 응답에 사용된다. HTTP 요청과 독립적으로 작동한다.
+* `@RequestParam` 👉 파라미터 이름으로 바인딩한다.
+  * `@RequestParam("username") String hello` → `request.getParameter("username")`
+  * HTTP 파라미터와 이름과 매개 변수 이름이 같으면 생략 가능하다.
+    * `@RequestParam("age") int age` → `@RequestParam int age`
+  * `String`, `int` 등 단순 타입이면 `@RequestParam` 생략 가능하다.
+    * `@RequestParam int age` → `int age`
+  * `Map`, `MultiValueMap` 을 통해 값을 받을 수 있다.
+* **`GET 쿼리 파라미터`∙`POST HTML Form` 를 받을 때 사용한다.**
+
+> **`@RequestParam(required)`**
+> * 파라미터 필수 여부를 지정한다. 기본 값은 필수(`true`) 이다.
+> * `/request-param`
+>   * `username` 이 없으므로 400 예외가 발생한다.
+> * `/request-param?username=`
+>   * 파라미터 이름만 있고 값이 없는 경우 빈 문자로 통과된다. `String` 은 NULL 받을 수 있다.
+> * `/request-param` + `@RequestParam(required = false) int age`
+>   * `int`, `long` 등 기본 형에 NULL 입력할 수 없다. 500 예외가 발생한다.
+>   * NULL 을 받을 수 있는 `Integer` 로 변경하거나 `defaultValue` 옵션을 사용해야 한다.
+> * `@RequestParam(required = false, defaultValue = -1) int age`
+>   * 파라미터가 없는 경우, 빈 문자(`NULL`)인 경우 모두 `defaultValue` 값이 적용된다.
+
+#### @ModelAttribute 
+```java
+@Controller
+public class RequestParamController {
+
+	@RequestMapping("/model-attribute")
+	public String modelAttribute(@ModelAttribute HelloData data) {
+    
+    }
+}
+```
+
+* 객체 데이터를 받을 때 사용한다.
+  * 객체를 생성하고 `setter` 메소드를 통해 바인딩한다.
+  * 바인딩 오류가 발생하면, `BindException` 예외가 발생한다.
+* `@ModelAttribute` 는 생략할 수 있다.
+* **`GET 쿼리 파라미터`∙`POST HTML Form` 를 받을 때 사용한다.**
+
+> **참고**
+> `@RequestParam`∙`@ModelAttribute` 생략할 경우 다음과 같이 동작한다.
+> `@RequestParam` 👉 `String`, `int`, `Long` 같은 단순 타입
+> `@ModelAttribute` 👉 `ArgumentResolver` 로 지정해둔 타팁 외 나머지
+
+### HTTP Message Body
+#### @RequestBody - 단순 텍스트
+```java
+@Controller
+public class RequestBodyStringController {
+
+	@PostMapping("/request-body-string-v1)
+    public void requestBodyStringV1(HttpServletRequest request, HttpServletRespons response) {
+    	InputStream input = request.getInputStreama();
+    	String messageBody = StreamUtils.copyToString(input, UTF_8);
+        
+        response.getWriter().write("OK");
+    }
+
+	@PostMapping("/request-body-string-v2)
+    public void requestBodyStringV2(InputStream input, Writer responseWriter) {
+    	String messageBody = StreamUtils.copyToString(input, UTF_8);
+        
+        responseWriter.write("OK");
+    }
+    
+    @PostMapping("/request-body-string-v3)
+    public HttpEntity<String> requestBodyStringV3(HttpEntity<String> httpEntity) {
+    	String messageBody = httpEntity.getBody();
+        
+        return new HttpEntity<>("OK");
+    }
+    
+    @ResponseBody
+    @PostMapping("/request-body-string-v4)
+    public String requestBodyStringV4(@RequestBody String messageBody) {
+    	return "OK";
+    }
+}
+```
+
+* `HttpServletXXX` 을 매개 변수로 받아, `request.getInputStrem()`∙`response.getWriter()` 를 통해 HTTP 요청∙응답에 접근한다.
+* `InputStream`∙`OutputStream` 를 파라미터로 받을 수 있다.
+* `HttpEntity` 👉 HTTP header, body 정보를 조회한다.
+  * 메세지 바디 정보를 조회하거나 입력할 수 있다.
+    * 응답에도 사용 가능하다.
+  * `RequestEntity`∙`ResponseEntity` 는 `HttpEntity` 를 상속해서 각각 요청∙응답에 사용된다.
+* `RequestEntity` 👉 HTTP API 요청에서 사용된다.
+  * HTTP Method, URL 정보가 추가되었다.
+  * `RequestEntity` → `@RequestHeader` + `@RequestBody`
+* `ResponseEntity` 👉 HTTP API 응답에서 사용된다. 
+  * HTTP 상태 코드 설정 가능하다.
+  * `ResponseEntity` → `@ResponseHeader` + `@ResponseBody`
+* HTTP 메시지 바디를 조회한다.
+* 요청 파라미터 조회 기능과 관련 없다. `@RequestParam` ❌, `@ModelAttribute` ❌
+
+> **요청 파라미터 vs HTTP 요청 메시지 바디**
+> * 요청 파라미터 조회 👉 `@RequestParam`, `@ModelAttribute`
+> * HTTP 요청 메시지 바디 조회 👉 `@RequestBody`
+
+> **`@ResponseBody`**
+> HTTP 메시지 바디에 데이터를 입력할 수 있다. 반환 값을 뷰 이름으로 사용하지 않는다.
+
+> **참고**
+> 스프링 MVC 는 **HTTP 메시지 컨버터(`HttpMessageConverter`)** 기능을 사용해서 HTTP 메시지 바디를 읽어 문자나 객체로 변환해서 전달한다.
+
+#### @RequestBody - JSON
+```java
+@Controller
+public class RequestBodyJsonController {
+
+	private ObjectMapper objectMapper = new ObjectMapper();
+    
+    @PostMapping("/request-body-json-v1")
+    public void requestBodyJsonV1(HttpServletRequest request, HttpServletResponse response) {
+    	InputStream input = request.getInputStreama();
+    	String messageBody = StreamUtils.copyToString(input, UTF_8);
+        
+        HelloData data = objectMapper.readValue(messageBody, HelloData.class);
+        
+        response.getWriter().write("OK");
+    }
+    
+    @ResponseBody
+    @PostMapping("/request-body-json-v2")
+    public String requestBodyJsonV2(@RequestBody String messageBody) {
+        HelloData data = objectMapper.readValue(messageBody, HelloData.class);
+        
+        return "OK";
+    }
+    
+    @PostMapping("/request-body-json-v3")
+    public HttpEntity<String> requestBodyJsonV3(HttpEntity<HelloData> httpEntity) {
+        HelloData data = httpEntity.getBody();
+        
+        return new HttpEntity<>("OK");
+    }
+    
+    @ResponseBody
+    @PostMapping("/request-body-json-v4")
+    public String requestBodyJsonV4(@RequestBody HelloData data) {
+        return "OK";
+    }
+}
+```
+
+* Jackson 라이브러리 `ObjectMapper` 를 사용해서 messageBody 를 객체로 변환한다.
+* `@RequesyBody` 를 사용해 messageBody 를 매개 변수로 받아 객체로 변환한다.
+  * `objectMapper` 를 이용해 json 으로 변환하는 과정은 똑같이 불편하다.
+* `HttpEntity<HelloData> httpEntity` → 객체 타입으로 조회할 수 있다.
+* `@RequestBody HelloData data` → `@RequestBody` 에 객체를 지정할 수 있다.
+  * `HttpEntity` 혹은 `@RequestBody` 를 사용하면 HTTP 메시지 컨버터가 문자, 객체, JSON → 객체 변환해준다.
+* `@RequestBody` 는 생략 불가능하다.
+  * `@RequestBody` 를 생략하면 `@RequestParam` 혹은 `@ModelAttribute` 가 동작한다.
+    * `String`, `int` 등 단순 타입 → `@RequestParam`
+    * 나머지 → `@ModelAttribute`
+
+> **주의**
+> HTTP 요청 content-type : application/json 인 경우에만 JSON → 객체 변환을 처리하는 HTTP 메시지 컨버터가 동작한다.
+
+> **참고**
+> `@ResponseBody` 를 사용하면, 반환 값이 객체 일때 JSON 변환이 이루어진다.
+> * `@RequestBody` 👉 JSON → HTTP 메시지 컨버터 → 객체
+> * `@ResponseBody` 👉 객체 → HTTP 메시지 컨버터 → JSON
+
+## HTTP 응답
+* 정적 리소스
+  * HTML, CSS, JS 을 제공한다.
+* 뷰 템플릿 사용
+  * 동적인 HTML 을 제공할 때, 뷰 팀플릿을 사용한다.
+* HTTP 메시지 사용
+  * HTTP API 를 제공할 때, HTTP 메시지 바디에 JSON 형식으로 데이터를 전송한다.
+  
+### 정적 리소스
+* **정적 리소스는 해당 파일을 변경 없이 그대로 전송한다.**
+* 스프링 부트는 다음 디렉토리에 이는 정적 리소스를 제공한다.
+  * `/static`, `/public`, `/resources`, `/META-INF/resources`
+* `src/main/resource` 는 리소스를 보관하는 곳이다.
+  * `src/main/resources/static/hello.html` → `http://localhost:8080/hello.html`
+  
+### 뷰 템플릿
+```java
+@Controller
+public class ResponseViewController {
+
+	@RequestMapping("/response-view-v1")
+    public ModelAndView responseViewV1() {
+    	ModelAndView mv = new ModelAndView("hello");
+        mv.addObject("data", "Hello!");
+        
+        return mv;
+    }
+    
+    @RequestMapping("/response-view-v2")
+    public String responseViewV2(Model model) {
+    	model.addAttribute("data", "Hello!");
+
+        return "hello";
+    }
+    
+    @RequestMapping("/response-view-v3")
+    public void responseViewV3(Model model) {
+    	model.addAttribute("data", "Hello!");
+    }
+}
+```
+
+* `String` 반환 값
+  * `@ResponseBody` 가 없으면, 뷰 지졸버가 실행되어서 `hello` 뷰를 찾고 렌더링 한다.
+  * `@ResponseBody` 가 있으면, HTTP 메시지 바디에 `hello` 문자가 입력된다.
+* `Void` 반환 값
+  * `@Controller` 를 사용하고 HTTP 메시지 바디를 처리하는 파라미터가 없으면 요청 URL을 참고해서 논리 뷰 이름으로 반환한다.
+  * 명시성이 너무 떨어진다. 사용하지 말자.
+  
+> **`ThymeleafViewResolver`**
+> `Thymeleaf` 라이브러리를 추가하면, 스프링 부트가 `ThymeleafViewResolver` 를 자동으로 스프링 빈으로 등록한다. 
+> `ThymeleafViewResolver` 은 다음과 같은 설정을 기본 값으로 가진다.
+>
+> `spring.thymeleaf.prefix=classpath:/templates/`
+> `spring.thymeleaf.suffix=.html`
+
+### HTTP API
+```java
+@RestController
+public class ResponseBodyController {
+	
+    @GetMapping(/response-body-string-v1)
+    public void responseBodyV1(HttpServletResponse response) {
+    	response.getWriter().write("OK");
+    }
+    
+    @GetMapping(/response-body-string-v2)
+    public ResponseEntity<String> responseBodyV2() {
+    	return new ResponseEntity<>("OK", HttpStatus.OK);
+    }
+    
+    @ResponseBody
+    @GetMapping(/response-body-string-v3)
+    public String responseBodyV3() {
+    	return "OK";
+    }
+    
+    @GetMapping("/response-body-json-v1")
+ 	public ResponseEntity<HelloData> responseBodyJsonV1() {
+ 		HelloData data = new HelloData();
+ 		data.setUsername("userA");
+ 		data.setAge(20);
+        
+ 		return new ResponseEntity<>(data, HttpStatus.OK);
+ 	}
+    
+    @ResponseStatus(HttpStatus.OK)
+ 	@ResponseBody
+ 	@GetMapping("/response-body-json-v2")
+ 	public HelloData responseBodyJsonV2() {
+ 		HelloData data = new HelloData();
+ 		data.setUsername("userA");
+ 		data.setAge(20);
+ 
+ 		return data;
+ 	}
+}
+```
+
+* `@RestController` 👉 `@Controller` + `@ResponseBody`
+  * 해당 클래스의 모든 메소드에 `@ResponseBody` 가 적용된다.
+  * HTTP 메시지 바디에 데이터를 입력한다.
+  * HTTP API(`REST API`)를 만들 때 사용한다.
+  
+> **참고**
+> 뷰 템플릿을 사용해도, 결국에는 HTTP 응답 메시지 바디에 HTML 데이터가 입력되어 전달된다. 
+> 여기서 설명하는 것은 정적 리소스나 뷰 템플릿을 거치치 않고, 직접 HTTP 응답 메시지 바디에 데이터를 입력하는 것을 말한다.
+
+## HTTP 메시지 컨버터
+![](https://velog.velcdn.com/images/pipiolo/post/6d1b689e-0f74-45e8-b121-98524315f319/image.png)
+
+* HTTP API 처럼 JSON 데이터를 HTTP 메시지 바디에 직접 읽거나 쓰는 경우 사용한다.
+* 스프링 MVC 는 다음의 경우에 HTTP 메시지 컨버터를 적용한다.
+  * HTTP 요청 : `@RequestBody`, `RequestEntity`, `HttpEntitiy`
+  * HTTP 응답 : `@ResponseBody`, `ResponseEntity`, `HttpEntitiy`
+* `@ResponseBody`
+  * HTTP의 메시지 바디에 문자 내용을 직접 입력한다.
+  * `ViewResolver` 대신에 `HttpMessageConverter` 가 동작한다.
+    * `StringHttpMessageConverter` 👉 문자 처리
+    * `MappingJackson2HttpMessageConverter` 👉 객체 JSON 처리
+* HTTP 메시지 컨버터는 HTTP 요청∙응답 모두 사용된다.
+* `ByteArrayHttpMessageConverter` 👉 byte[]
+* `StringHttpMessageConverter` 👉 String
+* `MappingJackson2HttpMessageConverter` 👉 application/json
+
+### RequestMappingHandlerAdapter 구조
+![](https://velog.velcdn.com/images/pipiolo/post/0fc9fd8f-4c79-472a-8f7d-dfa363ce495f/image.png)
+
+* `RequestMappingHandlerAdapter` 는 `ArgumentResolver` 를 호출해서 컨트롤러가 필요하는 다양한 파라미터를 생성한다.
+  * `ArgumentResolver` 덕분에 애노테이션 기반 컨트롤러는 매우 다양한 파라미터를 유연하게 받을 수 있다.
+* `ReturnValueHandler` 는 컨트롤러 반환 값을 변환하고 처리한다.
+  * 애노테이션 기반 컨트롤러는 `ModelAndView`, `String`, `@ResponseBody` 등 다양한 값을 반환할 수 있다.
+* `HttpMessageConverter`
+  * HTTP 요청(`@RequestBody`, `HttpEntity`) 를 처리하는 `ArgumentResolver` 가 HTTP 메시지 컨버터를 호출해 컨트롤러가 필요로 하는 파라미터를 생성한다.
+  * HTTP 응답(`@ResponseBody`, `HttpEntity`) 를 처리하는 `ReturnValueHandler` 가 HTTP 메시지 컨버터를 호출해 반환 값을 만든다.
+
+---
+
