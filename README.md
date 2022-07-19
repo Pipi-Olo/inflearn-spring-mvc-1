@@ -1,3 +1,6 @@
+> 이 글은 김영한 님의 **'스프링 완전 정복 로드맵'** 강의를 듣고 정리한 내용입니다.
+> 강의 : [스프링 MVC 1편 - 백엔드 웹 개발 핵심 기술](https://www.inflearn.com/course/%EC%8A%A4%ED%94%84%EB%A7%81-mvc-1/)
+
 # 웹 애플리케이션 이해
 ## 웹 서버, 웹 애플리케이션 서버
 ### 웹 서버 (Web Server)
@@ -901,12 +904,11 @@ public class MemberController {
 @RequestMapping("/mapping")
 @RestController
 public class MappingController {
-	
-    private final Logger log = LoggerFactory.getLogger(getClass());
     
     @GetMapping("/users/{userId}/orders/{orderId}")
-    public String mappingPath(@PathVariable("userId") String data, @PathVariable Long orderId) {
-    	log.info("userId = {}, orderId={}", data, orderId);
+    public String mappingPath(@PathVariable("userId") String data, 
+                              @PathVariable Long order
+    ) {
         return "OK";
     }
 }
@@ -1348,7 +1350,7 @@ public class LogController {
 ![](https://velog.velcdn.com/images/pipiolo/post/59de78fa-057e-4a26-8309-c71e49e4dbb6/image.png)
 
 * `새로 고침` 은 마지막에 서버에 전송한 데이터를 다시 전송한다.
-  * 마지막에 전송한 데이터가 상품을 등록하는 `Post /add` 이었으므로 사움이 계속해서 **중복 등록**된다.
+  * 마지막에 전송한 데이터가 상품을 등록하는 `Post /add` 이었으므로 상품이 계속해서 **중복 등록**된다.
 * 상품을 조회하는 `Get` 은 중복 호출되어도 문제 없다.
   * 회원 가입, 상품 주문 등 `Post` 중복 호출은 큰 오류를 일으킨다.
   
